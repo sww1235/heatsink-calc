@@ -1,6 +1,7 @@
 """Python Script to Calculate parameters of various heatsinks."""
 
 import math
+from scipy import constants as const
 
 
 class Heatsink:
@@ -20,7 +21,7 @@ class CylindricalAnnularFin(Heatsink):
     """Extend base heatsink class with a cylindrical annular fin heatsink."""
 
     def __init__(self, material, finSpacing, finRadius,
-                 finThickness, cylinderDiameter, heatsinkLength):
+                 finThickness, cylinderDiameter, numberOfFins, ambAirTemp):
         """
         Init remainder of class variables.
 
@@ -34,11 +35,15 @@ class CylindricalAnnularFin(Heatsink):
         cylinderDiameter: diameter of support cylinder
         heatsinkLength  : overall axial length of heatsink
         """
-        self.finSpacing = finSpacing
-        self.finRadius = finRadius
-        self.finThickness = finThickness
-        self.cylinderDiameter = cylinderDiameter
-        self.heatsinkLength = heatsinkLength
+        self.finSpacing = finSpacing  # in meters
+        self.finRadius = finRadius  # in meters
+        self.finThickness = finThickness  # in meters
+        self.cylinderDiameter = cylinderDiameter  # in meters
+        self.numberOfFins = numberofFins
+        self.heatsinkLength = ((self.finThickness * self.numberOfFins)
+                               + ((self.numberOfFins - 1) * self.finSpacing))
+        self.overallDiameter = self.cylinderDiameter + (2 * finRadius)
+        self.ambAirTemp = ambAirTemp  # degrees kelvin
 
         """
         NOTE: in order to prevent ridiculously long variable names, all
@@ -50,24 +55,74 @@ class CylindricalAnnularFin(Heatsink):
         nnInT   = Nusselt Number for the thin boundry layer of inner surface
         nnInFD  = Nusselt Number for fully developed regime inner surface
         """
-        if 0.1 <= L/D <= 8:
-            self.nn0 = ((3.36 + (0.087 * (L/D)))
-                        * math.sqrt(acc)
-                        * (finSpacing / ahs)
+        alpha =  # TODO thermal diffusivity of air meters^2 / seconds
+        beta =  # TODO Volumetric coefficient of thermal expansion 1/kelvin
+        heatsinkSurfaceTemp =  # TODO kelvin
+        kinematicViscosity =  # TODO meter^2/second
+        deltaT = heatsinkSurfaceTemp - ambAirTemp  # kelvin
+        hLoD = self.heatsinkLength / self.overallDiameter
+        cDoD = self.cylinderDiameter / self.overallDiameter
+        oneChannelArea = (math.pi * (((self.overallDiameter**2
+                                      - self.cylinderDiameter**2) / 2)
+                                     + (self.cylinderDiameter
+                                        * self.finSpacing)))
+        # area of circumscribed cylinder
+        areaCC = (math.pi * (((self.overallDiameter**2) / 2)
+                  + self.overallDiameter * self.heatsinkLength))  # meter^2
+        # inner surface area of heatsink
+        areaIn = (self.numberOfFins - 1) * oneChannelArea  # meter^2
+        # outer surface area of heatsink
+        areaOut = (math.pi * (((self.overallDiameter**2) / 2)
+                   + (self.numberOfFins
+                      * self.overallDiameter
+                      * self.finThickness)))  # meter^2
+        # overall area of heatsink
+        areaHS = areaIn + areaOut  # meter^2
+        RayleighNbrFinSpacing = ((const.g
+                                  * beta
+                                  * deltaT
+                                  * self.finSpacing**4)
+                                 / (kinematicViscosity
+                                    * alpha
+                                    * self.overallDiameter))
+        RayleighNbrOverallDiameter = ((const.g
+                                       * beta
+                                       * deltaT
+                                       * self.overallDiameter**3)
+                                      / (kinematicViscosity * alpha))
+        if 0.1 <= hLoD <= 8:
+            self.nn0 = ((3.36 + (0.087 * hLoD))
+                        * math.sqrt(areaCC)
+                        * (self.finSpacing / areaHS)
                         )
 
-        if 0.1 <= tNf/D <= 8:
-            self.nnOut = ((0.499 - (0.026 * math.log(tNf/D)))
-                          * math.pow(Rab, -0.25)
-                          * (Aout/Ahs)
+        if 0.1 <= (self.finThickness
+                   * self.numberOfFins
+                   / self.overallDiameter) <= 8:
+            self.nnOut = ((0.499 - (0.026 * math.log(self.finThickness
+                                                     * self.numberOfFins
+                                                     / self.overallDiameter)))
+                          * math.pow(RayleighNbrFinSpacing, 0.25)
+                          * (areaOut/areaHS)
                           )
-        if (0.1 <= d/D <= 8) and (2.9 * 10**4 <= Rad <= 2.3 * 10**5):
-            nnInT = (0.573-(0.184 * (d/D)) +( 0.0388 * (d/D)**2))
+        if (0.1 <= cdoD <= 8) and (2.9 * 10**4
+                                   <= RayleighNbrOverallDiameter
+                                   <= 2.3 * 10**5):
+            nnInT = ((0.573-(0.184 * cdoD) + (0.0388 * cdoD**2))
+                     * math.pow(RayleighNbrFinSpacing, 0.25))
+            nnInFD = (((0.0323
+                       - (0.0517 * cdoD)
+                       + (0.11 * cdoD**2))
+                       * math.pow(RayleighNbrFinSpacing, 0.25))
+                      + (0.0516 + (0.0154 * cdoD)
+                      - (0.0433 * cdoD**2)
+                      + (0.0792 * cdoD**3)) * RayleighNbrFinSpacing)
         n = 1
         self.nnIn = (math.pow(math.pow(nnInT, -n)
                      + math.pow(nnInFD, -n), (-1/n)
                               )
-                     * (Ain/ahs)
+                     * (areaIn/areaHS)
                      )
         self.nn = (self.nnIn + self.nnOut + self.nn0)
+
         super(Child, self).__init__(material, self.__name__)
