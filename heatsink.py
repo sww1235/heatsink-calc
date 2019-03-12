@@ -1,7 +1,9 @@
-"""Python Script to Calculate parameters of various heatsinks."""
+"""Class representations of heatsinks."""
 
 import math
 from scipy import constants as const
+
+from materials import Aluminium_6063 as aluminium
 
 
 class Heatsink:
@@ -21,7 +23,8 @@ class CylindricalAnnularFin(Heatsink):
     """Extend base heatsink class with a cylindrical annular fin heatsink."""
 
     def __init__(self, material, finSpacing, finRadius,
-                 finThickness, cylinderDiameter, numberOfFins, ambAirTemp):
+                 finThickness, cylinderDiameter, numberOfFins,
+                 ambAirTemp, maxJunctionTemp, maxSurfaceTemp):
         """
         Init remainder of class variables.
 
@@ -34,6 +37,7 @@ class CylindricalAnnularFin(Heatsink):
         finThickness    : thickness of individual fin
         cylinderDiameter: diameter of support cylinder
         heatsinkLength  : overall axial length of heatsink
+        overall diameter: outside diameter of heatsink including fins.
         """
         self.finSpacing = finSpacing  # in meters
         self.finRadius = finRadius  # in meters
@@ -44,6 +48,8 @@ class CylindricalAnnularFin(Heatsink):
                                + ((self.numberOfFins - 1) * self.finSpacing))
         self.overallDiameter = self.cylinderDiameter + (2 * finRadius)
         self.ambAirTemp = ambAirTemp  # degrees kelvin
+        self.maxJunctionTemp = maxJunctionTemp
+        self.maxSurfaceTemp = maxSurfaceTemp
 
         """
         NOTE: in order to prevent ridiculously long variable names, all
@@ -55,10 +61,13 @@ class CylindricalAnnularFin(Heatsink):
         nnInT   = Nusselt Number for the thin boundry layer of inner surface
         nnInFD  = Nusselt Number for fully developed regime inner surface
         """
-        alpha =  # TODO thermal diffusivity of air meters^2 / seconds
-        beta =  # TODO Volumetric coefficient of thermal expansion 1/kelvin
+        # thermal diffusivity of air at atmospheric pressure at 25C
+        alpha = 22.39 * 10**(-6)  # (meters^2) / seconds
+        # Volumetric coefficient of thermal expansion
+        beta = aluminium.expansionCoefficient  # 1/kelvin
         heatsinkSurfaceTemp =  # TODO kelvin
-        kinematicViscosity =  # TODO meter^2/second
+        # at atmospheric pressure at 25C
+        kinematicViscosity = 15.52 * 10**(-6)  # meter^2/second
         deltaT = heatsinkSurfaceTemp - ambAirTemp  # kelvin
         hLoD = self.heatsinkLength / self.overallDiameter
         cDoD = self.cylinderDiameter / self.overallDiameter
@@ -126,3 +135,13 @@ class CylindricalAnnularFin(Heatsink):
         self.nn = (self.nnIn + self.nnOut + self.nn0)
 
         super(Child, self).__init__(material, self.__name__)
+
+        """
+        Nusselt number = (Qconv * b) / (Ahs deltaT k)
+        Qconv = heat flow rate by convection (Watts)
+        b = finSpacing (meters)
+        Ahs = Area of heatsink (meter^2)
+        deltaT = temperature difference between surface temp of
+                heatsink and ambient air temp.
+        k = thermal conductivity of material (Watts / (meter kelvin))
+        """
