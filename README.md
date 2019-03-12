@@ -1,9 +1,11 @@
 # heatsink-calc
 Python Script to Calculate parameters of various heatsinks.
 
+Material data from wikipedia and <https://www.engineeringtoolbox.com>
+
 ## Circular Annular Fin Heatsink
 
-The math in this is based on:
+The math in heatsink.py is based on:
 
 >Laminar Natural Convection Heat Transfer from
 >Isothermal Horizontal Cylinders with Annular Fins
